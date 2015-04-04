@@ -1,2 +1,2 @@
 # nand2tetris
-my excercises for nand2tetris book.
+This repository contains my solutions to excercises for nand2tetris book.
