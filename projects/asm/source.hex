@@ -1,0 +1,14 @@
+load R1 M[F001]
+load R2 M[F002]
+add R1 R2 R1
+load R2 M[F003]
+add R1 R2 R1
+load R2 M[F004]
+add R1 R2 R1
+load R2 M[F005]
+add R2 R1 R2
+store R2 M[F010]
+load R1 M[F011]
+sub R2 R1 R1
+store R1 M[F012]
+
