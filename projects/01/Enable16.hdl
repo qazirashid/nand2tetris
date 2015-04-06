@@ -1,0 +1,8 @@
+CHIP Enable16{
+    IN a[16], en;
+    OUT out[16];
+
+    PARTS:
+    
+    And16(a[0..15]=a[0..15], b[0]=en, b[1]=en, b[2]=en, b[3]=en, b[4]=en, b[5]=en, b[6]=en, b[7]=en, b[8]=en, b[9]=en, b[10]=en, b[11]=en, b[12]=en, b[13]=en, b[14]=en, b[15]=en, out=out);
+}

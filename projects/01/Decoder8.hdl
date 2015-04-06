@@ -1,0 +1,20 @@
+CHIP Decoder8{
+     IN sel[3];
+     OUT out[8];
+     PARTS:
+     
+     Not(in=sel[0],out=sp0);
+     Not(in=sel[1],out=sp1);
+     Not(in=sel[2],out=sp2);
+     
+     And3Way(a[0]=sp0,    a[1]=sp1,	a[2]=sp2,	out = out[0]);
+     And3Way(a[0]=sel[0], a[1]=sp1, 	a[2]=sp2, 	out = out[1]);
+     And3Way(a[0]=sp0,    a[1]=sel[1], 	a[2]=sp2, 	out = out[2]);
+     And3Way(a[0]=sel[0], a[1]=sel[1], 	a[2]=sp2, 	out = out[3]);
+     And3Way(a[0]=sp0,    a[1]=sp1, 	a[2]=sel[2], 	out = out[4]);
+     And3Way(a[0]=sel[0], a[1]=sp1, 	a[2]=sel[2], 	out = out[5]);
+     And3Way(a[0]=sp0,    a[1]= sel[1], a[2]=sel[2], 	out = out[6]);
+     And3Way(a[0]=sel[0], a[1]= sel[1], a[2]=sel[2], 	out = out[7]);
+         
+     
+}

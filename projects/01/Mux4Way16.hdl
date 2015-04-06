@@ -1,0 +1,44 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/Mux4Way16.hdl
+
+/**
+ * 4-way 16-bit multiplexor:
+ * out = a if sel == 00
+ *       b if sel == 01
+ *       c if sel == 10
+ *       d if sel == 11
+ */
+
+CHIP Mux4Way16 {
+    IN a[16], b[16], c[16], d[16], sel[2];
+    OUT out[16];
+
+    PARTS:
+    // Put your code here:
+    
+    //Create enablers for 4 And16En.hdl chips using sel lines
+
+    Not(in=sel[0], out=selprime0);
+    Not(in=sel[1], out=selprime1);
+    
+    And(a=selprime0, b=selprime1, out=ena);
+    And(a=sel[0], b=selprime1, out=enb);
+    And(a=selprime0, b=sel[1], out=enc);
+    And(a=sel[0], b=sel[1], out=end);
+    
+    // 4 16 bit Enabled by selection bits for first stage
+    
+    Enable16(a=a, en=ena, out=outa);
+    Enable16(a=b, en=enb, out=outb);
+    Enable16(a=c, en=enc, out=outc);
+    Enable16(a=d, en=end, out=outd);
+    
+    // Now 16 bit Ors to select only one
+    
+    Or16(a=outa, b=outb, out=out1);
+    Or16(a=outc, b=outd, out=out2);
+    Or16(a=out1, b=out2, out=out);
+     
+}
