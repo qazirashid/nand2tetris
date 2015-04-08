@@ -145,7 +145,7 @@ int isnumericsymbol(char *symbol, size_t len){
 int main(int argc, char **argv){
   
   FILE *infile, *outfile;
-  char *line; char currentcommand[BUFF_SIZE]={0}; char symbol[BUFF_SIZE]={0};
+  char *line;  char symbol[BUFF_SIZE]={0}; //char currentcommand[BUFF_SIZE]={0};
   char destmn[5]={10}; char compmn[10]={0}; char jumpmn[10];
   int16_t address=0, next_RAM_add=16; // RAM addresses after 16 are allocated.
   char addressbits[17]={0}; char cmdbits[17]={0};
@@ -346,10 +346,14 @@ int parseC_COMMAND(char *line, size_t len, char * destmn, char *compmn, char *ju
 int16_t getsymaddress(char* symbol, size_t len){
   long tempaddress;
   int16_t address = -1;
-  if(isdigit(symbol[0])){
-    tempaddress = strtol(symbol, NULL, 10);
-  address = tempaddress;
+  if(!isnumericsymbol(symbol, len)){
+    printf("ERROR: Expected a number but found %s\n", symbol);
+    exit(118);
   }
+  //if(isdigit(symbol[0])){
+    tempaddress = strtol(symbol, NULL, 10);
+    address = tempaddress;
+    //}
   return address;
 }
 
@@ -377,6 +381,10 @@ int getcommandbits(char *destmn, char *compmn, char *jumpmn, char *cmdbits){
 
   //getcompbits() and copycompbits;
   compbits = valuefromkey(compmn);
+  if(compbits == NULL){
+    printf("ERROR: Unrecognized mnemonic %s\n",compmn);
+    exit(119);
+  }
   if(strlen(compbits) != 7){
     printf("expected comp bit %d, but got %du", 7, strlen(compbits));  
     exit(102);
@@ -397,6 +405,10 @@ int getcommandbits(char *destmn, char *compmn, char *jumpmn, char *cmdbits){
     }
     //getjumpbits();
   jumpbits = valuefromkey(jumpmn);
+  if(jumpbits == NULL){
+    printf("ERROR: Unrecognized mnemonic %s\n", jumpmn);
+    exit(119);
+  }
   
   for(i=0; i<3; i++)
     cmdbits[i+13] = jumpbits[i];
