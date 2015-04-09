@@ -144,8 +144,8 @@ int isnumericsymbol(char *symbol, size_t len){
 /*************** Main ***************/
 int main(int argc, char **argv){
   
-  FILE *infile, *outfile;
-  char *line;  char symbol[BUFF_SIZE]={0}; //char currentcommand[BUFF_SIZE]={0};
+  FILE *infile, *outfile; char outfilename[50];
+  char *line;  char symbol[BUFF_SIZE]={0};  //char currentcommand[BUFF_SIZE]={0};
   char destmn[5]={10}; char compmn[10]={0}; char jumpmn[10];
   int16_t address=0, next_RAM_add=16; // RAM addresses after 16 are allocated.
   char addressbits[17]={0}; char cmdbits[17]={0};
@@ -153,19 +153,39 @@ int main(int argc, char **argv){
   ssize_t charsinline;
   enum cmdtype type = A_COMMAND;
 
-  line = (char*) malloc(128*sizeof(char));
-  if(argc!=3){
-    printf("Please specify one input file. and one output file\n");
-    return(1024);
+
+  if(argc !=2 && argc !=3){
+    printf("Usage ERROR: Arguments must be 1 or 2: \n Proper Use example:  assembler infile.asm outfile.hack\n Exampe: assembler infile.asm\n");
+    exit(1);
   }
+  // printf("ARG 1= %s    ARG 2= %s  ARG 3= %s \n", argv[0], argv[1], argv[2]);
+  if(argc==2){
+    //printf("Please specify one input file. and one output file\n");
+    //return(1024);
+    int i=0;
+    while((i<40) && (argv[1][i]=='.')){
+      outfilename[i]= argv[1][i];
+      i++;
+    }
+    while((i<40)&&(argv[1][i] != '.') && (argv[1][i] != ' ')){
+      outfilename[i] = argv[1][i];  // copy first part of file name
+      i++;
+    }
+    outfilename[i++] = '.'; outfilename[i++]='h'; outfilename[i++]='a'; outfilename[i++]='c'; outfilename[i++]='k'; outfilename[i]='\0';
+    fprintf(stderr, "STDERR: No output file has been specified. Wrting output in %s\n", outfilename);
+  }
+  if(argc == 3)
+    strcpy(outfilename, argv[2]);
+
   if((infile=fopen(argv[1],"r"))==NULL){
     printf("Could not open the input file %s\n", argv[1]);
      exit(1025);
   }
-  if((outfile=fopen(argv[2],"w"))==NULL){
+  if((outfile=fopen(outfilename,"w"))==NULL){
     printf("Could not open the output file %s\n", argv[2]);
     return(1025);
   }
+  line = (char*) malloc(128*sizeof(char));
   /******************* PASS 1******************************/
   while((charsinline=getline(&line, &linelen, infile))!= -1){
     currentline++;    
@@ -183,7 +203,7 @@ int main(int argc, char **argv){
       }
       //insert symbol into symbol table
       if(contains(symbol) != -1){
-	printf("ERROR: Line %d: Symbol [%s] has multiple definitions.\n", currentline, symbol);
+	printf("ERROR: Line %zu: Symbol [%s] has multiple definitions.\n", currentline, symbol);
 	exit(114);
        }
       symboltable[symboltable_end].value = address;
@@ -214,11 +234,11 @@ int main(int argc, char **argv){
     //printf("Type of command is %d\n", type);
     if(type==A_COMMAND){
       if(getsymbol(line, symbol, linelen)==0){
-	printf("ERROR: Line: %d: Syntax Error\n", currentline);
+	printf("ERROR: Line: %zu: Syntax Error\n", currentline);
 	exit(111);  // get the symbol in command.
       }
       if(strlen(symbol) >= MAX_SYM_LEN){
-	printf("ERROR: Line %d: Symbol name [%s] is too long", currentline, symbol);
+	printf("ERROR: Line %zu: Symbol name [%s] is too long", currentline, symbol);
 	exit(109);
       }
       if(isnumericsymbol(symbol, strlen(symbol)))
@@ -235,7 +255,7 @@ int main(int argc, char **argv){
 	next_RAM_add++;
 	symboltable_end++;
 	if(symboltable_end >= MAX_SYMBOLS){
-	  printf("ERROR: line %d: Too many symbols encountered. Not enough memory was allocated", currentline);
+	  printf("ERROR: line %zu: Too many symbols encountered. Not enough memory was allocated", currentline);
 	  exit(112);
 	}
 	//printf("ERROR: Line %d: Unrecognized Symbol [%s]", currentline, symbol);
@@ -259,6 +279,7 @@ int main(int argc, char **argv){
   }
   fclose(infile);
   fclose(outfile);
+  free(line);
   return(0);
 }
 
@@ -386,7 +407,7 @@ int getcommandbits(char *destmn, char *compmn, char *jumpmn, char *cmdbits){
     exit(119);
   }
   if(strlen(compbits) != 7){
-    printf("expected comp bit %d, but got %du", 7, strlen(compbits));  
+    printf("expected comp bit %d, but got %zu", 7, strlen(compbits));  
     exit(102);
   }
   for(i=0; i<7; i++){
