@@ -1,0 +1,82 @@
+* Virtual Machines
+// Notes from book: Elements of Computing Systems by Noam Nisan and Shimon Schocken
+
+
+The concept of virtual machines was introduced to address the problem of program portability. 
+Programs that were compiled for one hardware could not be used when hardware was changed and such programs either had to be 
+recompiled for new hardware or rewritten in assembly. This was waster of resources. Also new compilers had to know the machine language of target hardware.
+ 
+
+The idea is to compile the program not to assembly or machine code for a given hardware but to a virtual machine (VM) Intermediate Language (IL) code.
+Then the IL is translated to the assembly or machine code of target hardware by the VM implementation. If a new hardware becomes available, it only needs to implement the VM which is
+well specified and all the code that was written in VM's IL becomes executable on the new hardware.
+The compiler writers don't need to think about the target hardware but only about the specified VM. 
+
+Examples of VM:   Java VM [java, Iron Python, Scala] , .NET Common Language Runtime (CLR) VM by Microsoft [C#, F# etc],  Low Level VM (LLVM)[Clang, Objective C, and many more]
+
+
+The hack VM is used in this course for building basic concepts. It is not as sophisticated  as the VMs listed above but it is good for learning.
+
+** Hack VM Specification.
+The VM specification needs to be standardised and agreed upon. Its specification is very important both for implementing the VM on a target hardware and for compilers to generate IL code for the VM.
+
+
+The VM language has four types of instructions.
+*** Arithmetic
+*** Memory Access
+every VM program written in IL uses segments of memory that are managed by the VM implementation.  There are 8 memory segments defined by the VM specification.
+**** Argument
+It stores the arguments for a function. This is allocated dynamically by the VM implementation when the function is entered/called. The arguments to the functions are placed in this segment.
+
+**** Local 
+It stores the local variables of a function. It is also allocated dynamically by the VM implementation. The function can create local variables in this segment. All local variable are initialised to zero at allocation time.
+
+**** static
+It is used to store static variables. Static variables are shared by all function calls occuring in a .vm file. where .vm file contains the VM program written in IL.
+The values of static variables are preserved between function calls. Thus functions can use them as state variables to do different things on different calls depending on the state [totally opposite to what functional programming languages do]. 
+The VM IL functions are not pure functions  as functions are in a functional programming language. The VM IL functions have side effects if they make use of the static segment.
+
+**** constant
+A pseudo segment that holds all the constant values. It is emulated by the VM implementation.
+
+**** this
+There are two general purpose memory segments 'this' and 'that' which are seen by every VM function.
+The program can make use of these segments to allocate memory dynamically for its data structures.
+
+**** that
+**** pointer
+It is two entry segment. It only holds the base memory addresses of this and that segment.
+
+**** temp
+it is 8 entry segment that can hold temporary variables. These are shared by all VM functions in a program.
+
+*** Program Flow
+*** Subroutine Calling
+
+Chapter 7 will be about translation of Arithmetic and Memory Access instructions. Chapter 8 will be about translation of Program Flow and Subroutine calling.
+
+This VM to Assembly translation is one example of working with back end of compilers.
+
+The underlying data structure is Stack which will be foundation of our VM.
+
+The language of VM (Intermediate Language IL) must be formalised and standardised.
+This can allow the decoupling of compiler front end design and compiler back end design.
+It may also make it possible to share code between different high level languages(e.g. java and Scala);
+
+
+** VM implementation
+The task of a VM implementation is to read a program written in IL and generate assembly code for the target hardware.
+To do this the VM implementation needs to implement the VM specification on the target hardware. 
+
+The VM implementation is thus responsible for managing memory segments of VM. It also manages two additional data structures that help it to translate the IL to assembly.
+The two data structures are 'Stack' and 'Heap'. The stack and heap are not explicitly used by the VM commands but change because of the side effects of the commands in order to manage memory segments and function calls.
+
+
+We will build a VM implementation for Hack computer in two stages.
+*** Stage 1
+In stage 1 the VM world is emulated on the target platform. Each data structure ( 'Stack' and 'Heap') and virtual memory segments used by the VM programs are emulated in the RAM of hack computer.
+
+*** Stage 2
+In stage 2 each VM command is translated into a series of instructions for Hack CPU. The side effects of the instruction are emulated to maintain the consistency of data structures and virtual memory segments are affected by the execution of VM command under consideration.
+
+
