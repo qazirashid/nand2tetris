@@ -165,6 +165,23 @@ public:
   }
   int writeArithmetic(std::string str){
     outfile << "Wrote Arithmetic Command:" << str << std::endl;
+    if(str == "add"){
+      // add the two numbers on top of Stack.
+      //Decrement SP
+      outfile<< "@SP\r\n M=M-1\r\n"
+      // Look at memory location SP, pick address from there, put it into register A,
+      // then move the contents of address in Register A.
+      outfile << "@SP\r\n A=M\r\n D=M\r\n";
+      //Decrment Stack Pointer,
+      outfile << "@SP\r\n M=M-1\r\n";
+      //Make A register point where SP is pointing and then Add the contents of that location with contents of register D
+      //save the result in register D.
+      outfile<<"@SP\r\n A=M\r\n M=D+M\r\n";
+      //increment SP
+      outfile<<""
+      //addition is complete. All assembly code is written.
+
+    }
     return(1);
   }
   int writePushPop(vm_command_type ct, std::string segment, int index){
@@ -210,6 +227,7 @@ int main(void){
     switch(command_type){
     case C_ARITHMETIC:
       writer.writeArithmetic(parser.arg1());
+      
       break;
     case C_PUSH:
       writer.writePushPop(C_PUSH, parser.arg2(), 2); //parser gives us string for index. we will need to convert it to integer.
