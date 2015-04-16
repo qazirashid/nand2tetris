@@ -1,4 +1,5 @@
 //implements the parser module for virtual machine implmentation as suggested in the book.
+// I also implemented the CodeWriter module in the same file.
 
 
 #include <iostream>
@@ -168,7 +169,7 @@ public:
     if(str == "add"){
       // add the two numbers on top of Stack.
       //Decrement SP
-      outfile<< "@SP\r\n M=M-1\r\n"
+      outfile<< "@SP\r\n M=M-1\r\n";
       // Look at memory location SP, pick address from there, put it into register A,
       // then move the contents of address in Register A.
       outfile << "@SP\r\n A=M\r\n D=M\r\n";
@@ -178,7 +179,7 @@ public:
       //save the result in register D.
       outfile<<"@SP\r\n A=M\r\n M=D+M\r\n";
       //increment SP
-      outfile<<""
+      outfile<<"@SP\r\n M=M+1";
       //addition is complete. All assembly code is written.
 
     }
