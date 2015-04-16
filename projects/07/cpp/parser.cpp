@@ -47,6 +47,7 @@ public:
       getline(infile, current_command);
       line_number++;
       getTokens(); 
+      command_type = calcCommandType();
       //int i=0;
       //std::cout << "Number of Tokens:" << tokens.size()<< "Token List=";
       //for( std::vector<std::string>::iterator tok=tokens.begin(); tok < tokens.end(); tok++){
@@ -65,8 +66,10 @@ public:
   int getLineNumber(){
     return(line_number);
   }
-  
   vm_command_type commandType(){
+    return command_type;
+  }
+  vm_command_type calcCommandType(){
     if(tokens.size()== 0)
       return(C_EMPTY);
     std::string arg1 = tokens[0];
@@ -134,6 +137,14 @@ public:
       return("");
     return(tokens[2]);
   }
+  int getPushPopIndex(){
+    if((command_type != C_PUSH) && (command_type != C_POP))
+      return(-1);
+    std::istringstream str(tokens[2]);
+    int out;
+    str >> out;
+    return(out);
+  }
   ~vmparser(){
     infile.close();
   }
@@ -147,6 +158,10 @@ class codewriter{
 private:
   std::fstream outfile;
   std::string newfilename;
+  
+  int symcount;
+  //std::string symstr="symbol";
+  //std::istringstream symbol(symstr);
 
   //std::vector<std::string> arith_commands;
   //std::vector<std::string> mem_segments;
@@ -158,47 +173,82 @@ public:
     outfile.open(filename.c_str(), std::ios::out);
     if(!outfile)
       std::cout << "CODE WRITER: Error Opening Output file\n";
+    symcount =0;
+  }
+  
+  std::string getNextSymbolName(){
+    std::ostringstream symbol("symbol");
+    symbol <<"symbol" <<symcount++;
+    return symbol.str();
   }
 
   
   void setFileName(std::string str) {
     newfilename = str;
   }
-  int writeArithmetic(std::string str){
-    outfile << "Wrote Arithmetic Command:" << str << std::endl;
-    if(str == "add"){
-      // add the two numbers on top of Stack.
-      //Decrement SP
-      outfile<< "@SP\r\n M=M-1\r\n";
-      // Look at memory location SP, pick address from there, put it into register A,
-      // then move the contents of address in Register A.
-      outfile << "@SP\r\n A=M\r\n D=M\r\n";
-      //Decrment Stack Pointer,
-      outfile << "@SP\r\n M=M-1\r\n";
-      //Make A register point where SP is pointing and then Add the contents of that location with contents of register D
-      //save the result in register D.
-      outfile<<"@SP\r\n A=M\r\n M=D+M\r\n";
-      //increment SP
-      outfile<<"@SP\r\n M=M+1";
-      //addition is complete. All assembly code is written.
-
-    }
-    return(1);
+  std::string incrementSP(){
+    return("@SP\r\n M=M+1\r\n");
   }
-  int writePushPop(vm_command_type ct, std::string segment, int index){
-    switch(ct){
-    case C_PUSH:
-      outfile << "Wrote Push Command for Segment " << segment << " at index " << index<< std::endl;
-      return(1);
-    case C_POP:
-      outfile << "Wrote Push Command for Segment " << segment << " at index " << index<< std::endl;
-      return(1);
-    default:
-      std::cout << "The command is not Push or Pop\n";
-      return(0);
-    }//end of switch
+  std::string decrementSP(){
+    return("@SP\r\n M=M-1\r\n");
+  }
+  std::string pushDtoStack(){
+    return("@SP\r\n A=M\r\n M=D\r\n" + incrementSP());
+  }
+  std::string popDfromStack(){
+    return(decrementSP() + "@SP\r\n A=M\r\n D=M\r\n");
+  }
+ 
 
-  }//end of writePushPop
+  int writeArithmetic(std::string str){
+    std::cout<< "Wrote Arithmetic Command:" << str << std::endl;
+    if(str == "add"){
+      outfile << popDfromStack(); //got the first argument
+      outfile << decrementSP(); //getting the second argument
+      outfile << "@SP\r\n A=M\r\n M=D+M\r\n";
+      outfile << incrementSP();
+      //addition is complete. All assembly code is written.
+    } // endif( str == add)
+    if(str == "sub"){
+       outfile << popDfromStack();
+       outfile << decrementSP();
+       outfile <<"@SP\r\n A=M\r\n M=M-D\r\n";
+       outfile << incrementSP();
+    }//endif(str==sub)
+
+    if(str =="eq"){
+      std::string symbol = getNextSymbolName();
+      std::string symbol2 = getNextSymbolName();
+      outfile << popDfromStack();
+      outfile << decrementSP();
+      outfile << "@SP\r\n A=M\r\n D=M-D\r\n@" << symbol << "\r\n D;JEQ\r\n";
+      //if D=0, the previous instructions will cause a jump to symbol. 
+      //if D!=0, we can continue and since we need to put a zero on top of stack
+      // we make D zero and push it on stack.
+      outfile << " D=0\r\n" << pushDtoStack()<< "@" << symbol2 <<"\r\n 0;JMP\r\n";
+      outfile << "(" << symbol << ")\r\n";
+      // now we have inserted the symbol in assembly. This marks the point where jump will happen
+      //if D contains a zero. in this case we need to put a -1 on stack. So just decrement D is push it 
+      //to stack.
+      outfile<< " D=D-1\r\n" << pushDtoStack() << "(" << symbol2 << ")\r\n";
+      //inserting symbol2 so that execution can jump here if D=0 without disturbing the stack.
+    }//endif(str==eq)
+    
+    return(1);
+  }//end writeArithmetic
+  void writePush(vm_command_type ct, std::string segment, int index){
+    if(segment == "constant"){
+      outfile << "@" << index << "\r\n D=A\r\n"; //constant loaded into register D
+      outfile << pushDtoStack();
+      }
+
+  }//end of writePush
+  void writePop(vm_command_type ct, std::string segment, int index){
+    if(segment == "constant"){
+      decrementSP(); // there is no need to overwrite memory. just decrement SP and it will be like popping to constant segment.
+    }
+
+  }//end of writePush
  
 
   ~codewriter(){
@@ -223,7 +273,7 @@ int main(void){
     parser.getCurrentString(line);
     std::cout<< "LINE=" << parser.getLineNumber() << ":" << line <<std::endl;
     command_type = parser.commandType();
-    std::cout << "COMMAND TYPE =" << enumlist[command_type] << "    ARG1=" << parser.arg1() << "    ARG2=" << parser.arg2()<< std::endl;
+    //std::cout << "COMMAND TYPE =" << enumlist[command_type] << "ARG1=" << parser.arg1() << "    ARG2=" << parser.arg2()<< std::endl;
     
     switch(command_type){
     case C_ARITHMETIC:
@@ -231,16 +281,16 @@ int main(void){
       
       break;
     case C_PUSH:
-      writer.writePushPop(C_PUSH, parser.arg2(), 2); //parser gives us string for index. we will need to convert it to integer.
+      writer.writePush(command_type, parser.arg2(), parser.getPushPopIndex());
       break;
     case C_POP:
-      writer.writePushPop(C_POP, parser.arg2(), 3);
+      writer.writePop(command_type, parser.arg2(), parser.getPushPopIndex());
       break;
     case C_INVALID:
-      std::cout << "ERROR: This command is not in the VM specification: LINE NO: " << parser.getLineNumber()<< std::endl;
+      //std::cout << "ERROR: This command is not in the VM specification: LINE NO: " << parser.getLineNumber()<< std::endl;
       break;
     default:
-      std::cout<<"This command is not implemented." << std::endl;
+      //std::cout<<"This command is not implemented." << std::endl;
       break;
     }
   }
