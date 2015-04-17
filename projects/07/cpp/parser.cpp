@@ -25,10 +25,10 @@ private:
 public:
   vmparser(std::string filename){
     
-    std::cout << " VM parser constructor called with file name" << filename << std::endl;
+    //std::cout << " VM parser constructor called with file name" << filename << std::endl;
     infile.open(filename.c_str(), std::ios::in); // string.c_str is used to convert std:string to const char *.
     if(!infile)
-      std::cout << "VM PARSER: Error Opening Input file\n";
+      std::cerr << "VM PARSER: Error Opening Input file [" << filename.c_str() << "] \n" ;
     line_number = 0;
     const std::string ac[] = {"add","sub","neg","eq","gt", "lt", "and", "or", "not"};
     arith_commands.insert(arith_commands.begin(), ac, ac+9); // populate the vector
@@ -123,24 +123,34 @@ public:
   }//end of getTokens();
   
   std::string arg1(){
-    if(tokens.size() < 1)
+    if(tokens.size() < 1){
+      std::cerr << "PARSE ERROR: LINE NO: " << line_number << " Command name was accessed but does not exist.\n"  ;
       return("");
+    }
     return(tokens[0]);
   }
   std::string arg2(){
-    if(tokens.size()<2)
+    if(tokens.size()<2){
+      std::cerr << "PARSE ERROR: LINE NO: " << line_number << " Argument 1 of Comamnd [" << arg1() << "] was requested but it does not exist.\n"  ;      
       return("");
+    }
     return(tokens[1]);
   }
   std::string arg3(){
-    if(tokens.size() < 3)
+    if(tokens.size() < 3){
+      std::cerr << "PARSE ERROR: LINE NO: " << line_number << " Argument 2 of Comamnd [" << arg1() << "] was requested but it does not exist.\n"  ;            
       return("");
+    }
     return(tokens[2]);
   }
   int getPushPopIndex(){
-    if((command_type != C_PUSH) && (command_type != C_POP))
+    if((command_type != C_PUSH) && (command_type != C_POP)){
+      std::cerr << "PARSE ERROR: LINE NO: " << " Index for push/pop was requested but this is not a push/pop command.\n"  ;      
       return(-1);
-    std::istringstream str(tokens[2]);
+    }
+    if(arg3() == "")
+      return(-1);
+    std::istringstream str(arg3());
     int out;
     str >> out;
     return(out);
@@ -169,10 +179,10 @@ private:
 public:  
   codewriter(std::string filename){
     
-    std::cout << "Code Writer constructor called with file name" << filename << std::endl;
+    //std::cout << "Code Writer constructor called with file name" << filename << std::endl;
     outfile.open(filename.c_str(), std::ios::out);
     if(!outfile)
-      std::cout << "CODE WRITER: Error Opening Output file\n";
+      std::cerr << "CODE WRITER: Error Opening Output file [" << filename.c_str() << "] \n";
     symcount =0;
   }
   
@@ -187,71 +197,104 @@ public:
     newfilename = str;
   }
   std::string incrementSP(){
-    return("@SP\r\n M=M+1\r\n");
+    return(" @SP\r\n M=M+1\r\n");
   }
   std::string decrementSP(){
-    return("@SP\r\n M=M-1\r\n");
+    return(" @SP\r\n M=M-1\r\n");
   }
   std::string pushDtoStack(){
-    return("@SP\r\n A=M\r\n M=D\r\n" + incrementSP());
+    return(" @SP\r\n A=M\r\n M=D\r\n" + incrementSP());
   }
   std::string popDfromStack(){
-    return(decrementSP() + "@SP\r\n A=M\r\n D=M\r\n");
+    return(decrementSP() + " @SP\r\n A=M\r\n D=M\r\n");
   }
- 
+  std::string pushTruetoStack(){
+    return(" D=-1\r\n" + pushDtoStack());
+  }
+  std::string pushFalsetoStack(){
+    return(" D=0\r\n" + pushDtoStack());
+  }
 
   int writeArithmetic(std::string str){
-    std::cout<< "Wrote Arithmetic Command:" << str << std::endl;
-    if(str == "add"){
-      outfile << popDfromStack(); //got the first argument
+    //std::cout<< "Wrote Arithmetic Command:" << str << std::endl;
+    if((str == "add") || (str == "sub") || (str == "and") || str == "or"){ //process commands with binary stack arguments.
+      outfile << popDfromStack(); //got the first argument and put in register D
       outfile << decrementSP(); //getting the second argument
-      outfile << "@SP\r\n A=M\r\n M=D+M\r\n";
-      outfile << incrementSP();
-      //addition is complete. All assembly code is written.
-    } // endif( str == add)
-    if(str == "sub"){
-       outfile << popDfromStack();
-       outfile << decrementSP();
-       outfile <<"@SP\r\n A=M\r\n M=M-D\r\n";
-       outfile << incrementSP();
-    }//endif(str==sub)
-
-    if(str =="eq"){
-      std::string symbol = getNextSymbolName();
+      outfile << " @SP\r\n A=M\r\n"; // get ready to access memory pointed to by SP
+      if(str == "add")
+	outfile << " M=D+M\r\n";
+      if(str == "sub")
+	outfile << " M=M-D\r\n";
+      if(str == "and")
+	outfile << " M=D&M\r\n";
+      if(str == "or")
+	outfile << " M=D|M\r\n";
+      outfile << incrementSP(); //prepare stack for next command
+      return(1);
+    } // endif( str == add, sub, and, or)
+    
+    
+    if((str =="eq") || (str == "gt") || (str == "lt")){
+      std::string symbol1 = getNextSymbolName(); //get two symbols to manage branching.
       std::string symbol2 = getNextSymbolName();
       outfile << popDfromStack();
       outfile << decrementSP();
-      outfile << "@SP\r\n A=M\r\n D=M-D\r\n@" << symbol << "\r\n D;JEQ\r\n";
-      //if D=0, the previous instructions will cause a jump to symbol. 
-      //if D!=0, we can continue and since we need to put a zero on top of stack
-      // we make D zero and push it on stack.
-      outfile << " D=0\r\n" << pushDtoStack()<< "@" << symbol2 <<"\r\n 0;JMP\r\n";
-      outfile << "(" << symbol << ")\r\n";
-      // now we have inserted the symbol in assembly. This marks the point where jump will happen
-      //if D contains a zero. in this case we need to put a -1 on stack. So just decrement D is push it 
-      //to stack.
-      outfile<< " D=D-1\r\n" << pushDtoStack() << "(" << symbol2 << ")\r\n";
-      //inserting symbol2 so that execution can jump here if D=0 without disturbing the stack.
-    }//endif(str==eq)
+      outfile << " @SP\r\n A=M\r\n D=M-D\r\n @" << symbol1 << "\r\n";
+      // D now contains result of x-y and jump location has been set in register A using [symbol1].
+      //in case result of x-y means "True" result for command, jump to [symbol1] now. Else don't jump.
+      if(str == "eq")
+	outfile << " D;JEQ\r\n";  // jump if x == y 
+      if(str == "gt")
+	outfile << " D;JGT\r\n";  //jump if x > y  
+      if(str == "lt")
+	outfile << " D;JLT\r\n";  //jump if x < y
+      // Now write code for pushing False to Stack. because if the jump did not occur we need to push False to stack
+      // After false has been pushed to stack, jump unconditionally to [symbol2]. This is necessary for skipping the code 
+      //that will push true after [symbol1] is encountered.
+      
+      outfile << pushFalsetoStack()<< " @" << symbol2 <<"\r\n 0;JMP\r\n"; 
+      outfile << "(" << symbol1 << ")\r\n"; //write definition of [symbol1]. The contorl will jump here if a True needs to be pushed to stack.
+      outfile << pushTruetoStack();
+      //now insert definition of [symbol2]. The next command will write commands after that.
+      outfile << "(" << symbol2 << ")\r\n";
+      return(1);
+    }//endif(str == eq, gt, lt)
+    if(str == "neg"){
+      outfile << decrementSP(); // make SP point to last pushed element.
+      outfile <<"@SP\r\n A=M\r\n M=-M\r\n";
+      outfile << incrementSP();
+      return(1);
+    } // endif(str == neg)
+    if(str == "not"){
+      outfile << decrementSP();
+      outfile << "@SP\r\n A=M\r\n M=!M\r\n";
+      outfile << incrementSP();
+      return(1);
+    }//endif (str == not)
     
-    return(1);
+    // Unknown command
+    std::cerr << "Code Writer Error: Received unknown arithmetic command [" << str <<"] \n";
+    return(0);
   }//end writeArithmetic
   void writePush(vm_command_type ct, std::string segment, int index){
     if(segment == "constant"){
-      outfile << "@" << index << "\r\n D=A\r\n"; //constant loaded into register D
+      outfile << " @" << index << "\r\n D=A\r\n"; //constant loaded into register D
       outfile << pushDtoStack();
       }
 
   }//end of writePush
   void writePop(vm_command_type ct, std::string segment, int index){
     if(segment == "constant"){
-      decrementSP(); // there is no need to overwrite memory. just decrement SP and it will be like popping to constant segment.
+      decrementSP(); // there is no need to overwrite top of stack as it will be overwritten by next push command.
     }
 
   }//end of writePush
  
 
   ~codewriter(){
+    // Write an indefinite loop at the end.
+    outfile << "(END)\r\n @END\r\n 0;JMP\r\n";
+
     outfile.close(); //release resources
   }  
 
@@ -259,19 +302,28 @@ public:
 }; // End of class codewriter
 
 
-int main(void){
+int main(int argc, char **argv){
+  
+  
   //std::cout << "Hello World \n";
   std::string in = "test.vm";
   std::string out ="testout.asm";
   std::string  line;
   vm_command_type command_type;
+  if(argc >1)
+    in.assign(argv[1]); // get input filename from command line argument.
+  if(argc >2)
+    out.assign(argv[2]);
 
   vmparser parser(in);
   codewriter writer(out);
+
+
+
   while(parser.hasMoreCommands()){
     parser.advance();
     parser.getCurrentString(line);
-    std::cout<< "LINE=" << parser.getLineNumber() << ":" << line <<std::endl;
+    //std::cout<< "LINE=" << parser.getLineNumber() << ":" << line <<std::endl;
     command_type = parser.commandType();
     //std::cout << "COMMAND TYPE =" << enumlist[command_type] << "ARG1=" << parser.arg1() << "    ARG2=" << parser.arg2()<< std::endl;
     
