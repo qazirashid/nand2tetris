@@ -69,6 +69,8 @@ public:
     if(tokens.size()== 0)
       return(C_EMPTY);
     std::string arg1 = tokens[0];
+    if(arg1 == "")
+      return(C_EMPTY);
     if(arg1 == "//")
       return(C_COMMENT);
     if(arg1 == "return")

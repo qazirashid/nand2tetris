@@ -14,9 +14,10 @@
 class codewriter{
 private:
   std::fstream outfile;
-  std::string newfilename;
+  std::string vmfilename;
   int symcount;
-
+  int stackbase, heapbase, pointerbase, tempbase;
+ 
 public:  
   codewriter(std::string filename){
     
@@ -24,8 +25,34 @@ public:
     outfile.open(filename.c_str(), std::ios::out);
     if(!outfile)
       std::cerr << "CODE WRITER: Error Opening Output file [" << filename.c_str() << "] \n";
-    symcount =0;
+    symcount =0;stackbase=256; heapbase=2048; pointerbase=3; tempbase=5;
+    //writeinit();
   }
+  
+  
+  void writeinit(){//sets up the memory segments in registers at the begining.
+    
+    outfile << " @"<<stackbase<<"\r\n D=A\r\n @SP\r\n M=D\r\n"; 
+    // put stackbase=256 in SP. Stack starts at RAM address 256.
+    // The ARG, LCL, THIS, THAT segments dependant on the function that is being called.
+    // Here we initilize those assuming that we are in main() function.
+    outfile <<" @"<< heapbase << "\r\n D=A\r\n @ARG\r\n M=D\r\n";
+    // Segment argument for arguments is initially set to the heap base. We will set aside 256 RAM
+    //addresses for argument segment. Base addres of argument segment is saved in the ARG register.
+    outfile <<" @"<< (heapbase + 256) << "\r\n D=A\r\n @LCL\r\n M=D\r\n";
+    //Segment local will be mapped to heapbase+256, where argument segment ends. It will be assigned
+    //1024 memory addresses. Its base address will be stored in register LCL.
+    outfile <<" @"<< (heapbase + 256 + 1024) << "\r\n D=A\r\n @THIS\r\n M=D\r\n";
+    // Segment this starts where segment local ends. It will be assigned 1024
+    // memory addresses and its address will be stored in THIS register. 
+    outfile <<" @"<< (heapbase + 256 + 1024 + 1024) << "\r\n D=A\r\n @THAT\r\n M=D\r\n";
+    // Segment that starts where semgemnt this ends. Since we don't need any other segment in heap, segmant that can grow
+    // uptill the end of heap. its base address will be stored in THAT register.
+    // Initialization is complete.
+    // Note that the Segments [static, pointer, temp] do not need initilization. As there base addresses are not stored in RAM
+    // but are taken from the specification. They are global segments for a given vm file.
+    // Segment [constant] is virtual which has been already implemented.
+ }
   
   std::string getNextSymbolName(){
     std::ostringstream symbol("symbol");
@@ -35,7 +62,7 @@ public:
 
   
   void setFileName(std::string str) {
-    newfilename = str;
+    vmfilename = str;
   }
   std::string incrementSP(){
     return(" @SP\r\n M=M+1\r\n");
@@ -122,14 +149,59 @@ public:
       outfile << " @" << index << "\r\n D=A\r\n"; //constant loaded into register D
       outfile << pushDtoStack();
       }
+    // for segments [local, argument, this, that]:
+    //Strategy: get_base_address_of_segment, add_index_to_it, and use it as RAM address, read content of this RAM address
+    //into register D and pushDtostack();
+    //Algorithm: base_address of segments are in [LCL, ARG, THIS, THAT] registers. To add index to it, put index into D,
+    //read base address into A and A=A+D. now D=M and pushDtoStack();
+    if((segment == "local") || (segment == "argument") || (segment == "this") || (segment == "that")){
+      //put index in D
+      outfile << " @" << index << "\r\n D=A\r\n";
+      // put base address of sement in A
+      putBaseAddressinA(segment); 
+      //A=A+D will ensure that target address got into A. read target content in D and pushDtoStack
+      outfile << " A=D+A\r\n D=M\r\n" << pushDtoStack();
+     }//endif [local|argument| this| that] 
 
   }//end of writePush
   void writePop(vm_command_type ct, std::string segment, int index){
     if(segment == "constant"){
       decrementSP(); // there is no need to overwrite top of stack as it will be overwritten by next push command.
     }
+    if((segment == "local") || (segment == "argument") || (segment == "this") || (segment == "that")){
+      //popping a segment seems a bit trickier than pushing a segment.
+      // we need D to calculate target address, but D is also needed to hold the value that will be 
+      // be transferred from stack to segment. While reading D from M did not change A, popping D from stack
+      // will change A. So we will lose the target address and will need D to calculate it. but if we use D to calculate the
+      //target address, we will lose the value that is popped.
+      //Strategy: calculate target address, store it temporarily in R13. Then PopDfromStack.
+      //Then Load A from R13 and M=D.
+      
+      //Algorithm: 1- Calculate target address. 2- Store in R13. 3- popDfromStack 4- Load A from R13 4- M=D 
+      outfile << " @" << index << "\r\n D=A\r\n";
+      putBaseAddressinA(segment); 
+      //D=A+D will ensure that target address got into D. Store it to R13
+      outfile << " D=D+A\r\n @R13\r\n M=D\r\n"; //Target address calculated and stored in R13.
+      //Now. 3. popDfromStack
+      outfile << popDfromStack(); // 
+      //Now load A from R13 and set M=D
+      outfile << " @R13\r\n A=M\r\n M=D\r\n "; //All done.
+ 
+     }//endif [local|argument| this| that] 
 
-  }//end of writePush
+  }//end of writePop
+
+  void putBaseAddressinA(std::string segment){
+    if(segment == "local")
+      outfile << "@LCL\r\n A=M\r\n";
+    if(segment == "argument")
+      outfile << "@ARG\r\n A=M\r\n";
+    if(segment == "this")
+      outfile << "@THIS\r\n A=M\r\n";
+    if(segment == "that")
+      outfile << "@THAT\r\n A=M\r\n";
+    
+  }// end of putBaseAddressinA
  
 
   ~codewriter(){
