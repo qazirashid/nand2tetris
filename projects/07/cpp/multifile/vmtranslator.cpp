@@ -27,7 +27,7 @@ int main(int argc, char **argv){
 
   vmparser parser(in);
   codewriter writer(out);
-
+  writer.setVMFileName(in);
 
 
   while(parser.hasMoreCommands()){
@@ -56,6 +56,6 @@ int main(int argc, char **argv){
     default:
       std::cerr<<"LINE NO. "<< lineno <<" WARNING: The command ["<< line << "] is not implemented." << std::endl;
       break;
-    }
-  }
+    }//end of switch(command_type)
+  } //end of while(parser.hasMoreCommands)
 }

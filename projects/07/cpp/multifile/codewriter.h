@@ -52,7 +52,7 @@ public:
     // Note that the Segments [static, pointer, temp] do not need initilization. As there base addresses are not stored in RAM
     // but are taken from the specification. They are global segments for a given vm file.
     // Segment [constant] is virtual which has been already implemented.
- }
+  }
   
   std::string getNextSymbolName(){
     std::ostringstream symbol("symbol");
@@ -60,8 +60,8 @@ public:
     return symbol.str();
   }
 
-  
-  void setFileName(std::string str) {
+
+  void setVMFileName(std::string str) {
     vmfilename = str;
   }
   std::string incrementSP(){
@@ -148,7 +148,8 @@ public:
     if(segment == "constant"){
       outfile << " @" << index << "\r\n D=A\r\n"; //constant loaded into register D
       outfile << pushDtoStack();
-      }
+      return;
+    }
     // for segments [local, argument, this, that]:
     //Strategy: get_base_address_of_segment, add_index_to_it, and use it as RAM address, read content of this RAM address
     //into register D and pushDtostack();
@@ -161,12 +162,41 @@ public:
       putBaseAddressinA(segment); 
       //A=A+D will ensure that target address got into A. read target content in D and pushDtoStack
       outfile << " A=D+A\r\n D=M\r\n" << pushDtoStack();
-     }//endif [local|argument| this| that] 
+      return;
+    }//endif [local|argument| this| that] 
+    if((segment == "temp") || (segment == "pointer")){
+	//the sements [temp , pointer] are directly mapped on the RAM in fixed locations.
+	// when we get a [ push temp 3], we get the contents of RAM[tempbase + 3] in register D
+	// and push D to Stack.
+	//Since we know the base address (does not change dynamically) and index in advance we can perform the 
+	// the arithmetic here instead of using the hack CPU at run time to do the arithmetic.
+      outfile << " @";
+	if(segment == "temp")
+	  outfile << (tempbase + index);
+	else 
+	  outfile << (pointerbase + index);
+	outfile << "\r\n D=M\r\n"; // contents of target RAM read into register D. now pushDtostack.
+	outfile << pushDtoStack(); //done
+	return;
+    }// edinf push [temp, pointer]
+    if(segment == "static"){
+      //For static segment, we make use the conention of Assembler to allocate the next available RAM location after R15
+      // to variables. So we will declare a new variable and let assembler assign it a location.
+      // We need to build a name for the variable. Hack convention is "vmfilename.index".
+      //We have the vmfilename set already. So build a name now.
+      //std::stringstream new_name(); // new string stream.
+      outfile << " @" << buildStaticName(index)<<"\r\n D=M\r\n"<< pushDtoStack(); //read variable into D and pushDtostack     
+      return;
+    }// endif push [static]
+    
+    std::cerr << "WARNING: Code Writer encountered unknown segment name [" << segment << "] in push command\n";
 
+       
   }//end of writePush
   void writePop(vm_command_type ct, std::string segment, int index){
     if(segment == "constant"){
       decrementSP(); // there is no need to overwrite top of stack as it will be overwritten by next push command.
+      return;
     }
     if((segment == "local") || (segment == "argument") || (segment == "this") || (segment == "that")){
       //popping a segment seems a bit trickier than pushing a segment.
@@ -186,23 +216,46 @@ public:
       outfile << popDfromStack(); // 
       //Now load A from R13 and set M=D
       outfile << " @R13\r\n A=M\r\n M=D\r\n "; //All done.
- 
-     }//endif [local|argument| this| that] 
+      return;
+     }//endif pop[local|argument| this| that] 
+    if((segment == "temp") || (segment == "pointer")){
+        // first popDfromstack, put the target address in A, and then M=D
+	outfile << popDfromStack() << " @"; // Now get the address.
+	if(segment == "temp")
+	  outfile << (tempbase + index);
+	else 
+	  outfile << (pointerbase + index);
+	outfile << "\r\n M=D\r\n"; // Target RAM is set to D, which was the top of the Stack.
+	return;
+    }// edinf pop[temp, pointer]
+    if(segment == "static"){
+      outfile << popDfromStack();
+      outfile << " @" << buildStaticName(index)<<"\r\n M=D\r\n";
+      return;
+    }// endif pop[static]
+    
+    std::cerr << "WARNING: Code Writer encountered unknown segment name [" << segment << "] in pop command\n";
+
 
   }//end of writePop
 
   void putBaseAddressinA(std::string segment){
     if(segment == "local")
-      outfile << "@LCL\r\n A=M\r\n";
+      outfile << "@LCL";
     if(segment == "argument")
-      outfile << "@ARG\r\n A=M\r\n";
+      outfile << "@ARG";
     if(segment == "this")
-      outfile << "@THIS\r\n A=M\r\n";
+      outfile << "@THIS";
     if(segment == "that")
-      outfile << "@THAT\r\n A=M\r\n";
-    
+      outfile << "@THAT";
+    outfile << "\r\n A=M\r\n";
   }// end of putBaseAddressinA
  
+  std::string buildStaticName(int index){
+    std::ostringstream name(vmfilename);
+    name << vmfilename << "." << index;
+    return(name.str());
+  }
 
   ~codewriter(){
     // Write an indefinite loop at the end.
