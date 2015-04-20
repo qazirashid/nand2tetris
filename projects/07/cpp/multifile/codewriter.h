@@ -257,6 +257,21 @@ public:
     return(name.str());
   }
 
+  void writeBranch(vm_command_type ct, std::string command,  std::string loc){
+    if(ct == C_LABEL)
+      outfile << "(" << loc <<")\r\n";
+    if(ct == C_GOTO)
+      outfile << "@" << loc << "\r\n 0;JMP \r\n";
+    if(ct == C_IF){
+      //std::string symbol1 = getNextSymbolName(); //get two symbols to manage branching.
+      //std::string symbol2 = getNextSymbolName();
+      outfile << popDfromStack(); //put top of stack to D
+      outfile << "@" << loc << "\r\n D;JNE\r\n";
+
+    }
+  
+  }
+
   ~codewriter(){
     // Write an indefinite loop at the end.
     outfile << "(END)\r\n @END\r\n 0;JMP\r\n";
