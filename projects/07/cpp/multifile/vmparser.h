@@ -143,10 +143,10 @@ public:
     return(tokens[2]);
   }
   int getPushPopIndex(){
-    if((command_type != C_PUSH) && (command_type != C_POP)){
-      std::cerr << "PARSE ERROR: LINE NO: " << " Index for push/pop was requested but this is not a push/pop command.\n"  ;      
-      return(-1);
-    }
+    //if((command_type != C_PUSH) && (command_type != C_POP)){
+    // std::cerr << "PARSE ERROR: LINE NO: " << " Index for push/pop was requested but this is not a push/pop command.\n"  ;      
+    // return(-1);
+    //}
     if(arg3() == "")
       return(-1);
     std::istringstream str(arg3());

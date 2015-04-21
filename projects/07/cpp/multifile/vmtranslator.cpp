@@ -53,7 +53,15 @@ int main(int argc, char **argv){
     case C_LABEL: case C_GOTO: case C_IF:
       writer.writeBranch(command_type, parser.arg1(), parser.arg2()); 
       break;
-
+    case C_FUNCTION:
+      writer.writeFuncDef(parser.arg2(), parser.getPushPopIndex());
+      break;
+    case C_RETURN:
+      writer.writeReturn();
+      break;
+    case C_CALL:
+      writer.writeCall(parser.arg2(), parser.getPushPopIndex());
+      break;
     case C_INVALID:
       std::cerr << "LINE No. " << lineno << " ERROR: The command [" << line << "] is not in the VM specification " << std::endl;
       break;

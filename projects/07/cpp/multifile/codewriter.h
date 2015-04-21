@@ -9,7 +9,7 @@
 #include "vm_cmd_type.h" //defines enumerated types for command types of virtual machine
 #include <vector>
 #include <algorithm>
-
+#include <stack>
 
 class codewriter{
 private:
@@ -17,6 +17,7 @@ private:
   std::string vmfilename;
   int symcount;
   int stackbase, heapbase, pointerbase, tempbase;
+  std::stack<std::string> funcstack;
  
 public:  
   codewriter(std::string filename){
@@ -258,29 +259,112 @@ public:
   }
 
   void writeBranch(vm_command_type ct, std::string command,  std::string loc){
+    std::string label;
+    label = getLabelPrefix() + "$" + loc;
+
     if(ct == C_LABEL)
-      outfile << "(" << loc <<")\r\n";
+      outfile << "(" << label <<")\r\n";
     if(ct == C_GOTO)
-      outfile << "@" << loc << "\r\n 0;JMP \r\n";
+      outfile << "@" << label << "\r\n 0;JMP \r\n";
     if(ct == C_IF){
       //std::string symbol1 = getNextSymbolName(); //get two symbols to manage branching.
       //std::string symbol2 = getNextSymbolName();
       outfile << popDfromStack(); //put top of stack to D
       outfile << incrementSP(); //incrementing Stack after popping top element to D
       //is necessary because we just want to look at the top element, not pop the top element.
-      outfile << "@" << loc << "\r\n D;JNE\r\n" ;
+      outfile << "@" << label << "\r\n D;JNE\r\n" ;
 
     }
   
   }
+  void writeFuncDef(std::string f, int k){ //write a definition of function with n_locals.
+     
+    funcstack.push(f); // pushing function names for constructing label names later.
+    int i;
+    //write label for function.
+    outfile << "(" << f << ")\r\n D=0\r\n"; //Here starts the function definition.
+    // D is set to 0 so that local variables can be initialized at stack.
+    for(i = 0; i< k; i++){
+      outfile << "// pushing local varialbe " << i << "\r\n"; 
+      outfile<< pushDtoStack(); 
+    } //pushed k loacal variables to stack each initialized as zero.
+  }
+  void writeCall(std::string f, int n){
+    std::string return_label;
+    return_label = vmfilename + "." + getLabelPrefix() + "$" + getNextSymbolName();
+    outfile << "// preparing new call to function. \n // pushing return address to stack \r\n";
+    outfile << " @" <<return_label << "\r\n D=A\r\n" << pushDtoStack(); //pushing the return address to stack.
+    outfile << "// push LCL \r\n @LCL\r\n D=M\r\n" << pushDtoStack();  //push LCL(current_value) 
+    //symbol LCL is a constant. This constant is not pushed. The value in register LCL is pushed.
+    outfile << "// pushing ARG \r\n @ARG\r\n D=M\r\n"  << pushDtoStack(); //push ARG
+    outfile << "// pushing THIS\r\n  @THIS\r\n D=M\r\n" << pushDtoStack(); //push THIS
+    outfile << "// pushing THAT\r\n @THAT\r\n D=M\r\n" << pushDtoStack(); //push That 
+    outfile << "//LCL=SP \r\n  @SP\r\n D=M\r\n @LCL\r\n M=D\r\n";   //read current contents of SP and set LCL to these contents.
+    //n5 = n + 5; // preparing to get base address of ARG. // this arithmetic can be done here. VM does not need to do it.
+    // To calculate ARG we need to subtract n+5 from SPs currents contents.
+    // push current contents of SP to stack. put n+5 in D and push D to stack. write a sub command.
+    // pop D from top of stack and store it in ARG.
+    outfile << "// calculating ARG base address\r\n @SP\r\n D=M\r\n" << pushDtoStack(); //current contents of SP on top of stack now.
+    outfile << " @" << (n + 5) << "\r\n D=A\r\n" << pushDtoStack(); // n+5 on top of stack now.
+    writeArithmetic("sub"); // wrote sub command. Now Top of Stack contains SP - n -5
+    outfile << popDfromStack(); // SP - n-5 is in D
+    outfile << "//saving ARG base address\r\n @ARG\r\n M=D\r\n"; //ARG = SP-n-5
+    outfile << " //Jumping to function entry point\r\n @" << f << "\r\n 0;JMP\r\n";
+    outfile << "// Putting return Label\r\n"<<"(" << return_label << ")\r\n";
 
+
+  }
+  void writeReturn(){
+    if(funcstack.empty()){
+      std::cerr << "A return from what? \n";
+      return;
+    }
+    funcstack.pop(); // when returning from a function, pop its names so that labels are constructed properly after this function.
+    outfile << "//preparing to return from function \r\n";
+    outfile << "//FRAME = LCL (FRAME=R13) \r\n";
+    outfile << " @LCL\r\n D=M\r\n @R13\r\n M=D\r\n"; //stored contents of LCL into R13.
+    outfile <<"// putting the returned result on top of stack of calling function.\r\n"; //popping result from called stack and pushing it to calling stack.
+    outfile << popDfromStack() << " @ARG\r\n A=M\r\n M=D\r\n"; // We went to location where ARG's contents were pointing and stored D there. 
+    //This location was the base address of ARG segment of called function and hence was the next location to the top of calling function stack.
+    outfile << " // restoring Stack pointer \r\n";
+    outfile << " @ARG\r\n D=M \r\n D=D+1\r\n @SP\r\n M=D\r\n";
+    // The ARG was pointing at the top of stack of calling function. We got that address into D.
+    // but since the called function has put a value of top of old stack we incremented D and set SP to D.
+    //SP is now restored and points to top of calling function stack with top value being the one returned by the called function.
+
+    outfile << "// restoring THAT\r\n"; // FRAME is in R13. so R13 currently contains (address+1) where THATs contents were stored previously.
+    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M \r\n @THAT\r\n M=D\r\n"; 
+    // We decrement R13 so that it pointed to THATs stored contents. Then we loaded A with that address and braught contents of memory to D.
+    //Then we loaded A with THAT and put D there. effectively restoring THATs contents before call.
+    outfile << "// restoring THIS\r\n";    
+    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M \r\n @THIS\r\n M=D\r\n";
+    //Did the same trick as before. This time restoring old contents of THIS
+    outfile << "// restoring ARG\r\n";
+    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M \r\n @ARG\r\n M=D\r\n"; 
+    //retored ARG
+    outfile << "// restoring LCL\r\n";
+    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M \r\n @LCL\r\n M=D\r\n"; // retored LCL
+    // if we decrement R13 just once more its contents will point at the value of returned address. 
+    outfile << "// Getting Return aAddress \r\n";
+    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M\r\n"; //return address is in D now.
+    //everything seems ready. Lets just get return address into A and Jump.
+    outfile << " // All ready. Eyes closed. jumping now.\r\n";
+    outfile <<  " A=D \r\n 0;JMP\r\n"; //hopefully  we will get there where we wanted to go.
+
+    
+  }
+  std::string getLabelPrefix(){
+    if(funcstack.empty())
+      return("");
+    else
+      return(funcstack.top());
+  }
   ~codewriter(){
     // Write an indefinite loop at the end.
     outfile << "(END)\r\n @END\r\n 0;JMP\r\n";
 
     outfile.close(); //release resources
-  }  
-
+  }
 
 }; // End of class codewriter
 
