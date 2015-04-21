@@ -266,7 +266,9 @@ public:
       //std::string symbol1 = getNextSymbolName(); //get two symbols to manage branching.
       //std::string symbol2 = getNextSymbolName();
       outfile << popDfromStack(); //put top of stack to D
-      outfile << "@" << loc << "\r\n D;JNE\r\n";
+      outfile << incrementSP(); //incrementing Stack after popping top element to D
+      //is necessary because we just want to look at the top element, not pop the top element.
+      outfile << "@" << loc << "\r\n D;JNE\r\n" ;
 
     }
   

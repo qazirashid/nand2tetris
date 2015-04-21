@@ -36,8 +36,8 @@ int main(int argc, char **argv){
     lineno = parser.getLineNumber();
     //std::cout<< "LINE=" << parser.getLineNumber() << ":" << line <<std::endl;
     command_type = parser.commandType();
-    //std::cout << "COMMAND TYPE =" << enumlist[command_type] << "ARG1=" << parser.arg1() << "    ARG2=" << parser.arg2()<< std::endl; 
-     
+    //std::cout << "COMMAND TYPE =" << enumlist[command_type] << "   ARG1=" << parser.arg1() << "    ARG2=" << parser.arg2()<< std::endl; 
+    
     switch(command_type){
     case C_EMPTY: case C_COMMENT:
       break; // skip comments and empty lines.
@@ -50,9 +50,15 @@ int main(int argc, char **argv){
     case C_POP:
       writer.writePop(command_type, parser.arg2(), parser.getPushPopIndex());
       break;
+    case C_LABEL: case C_GOTO: case C_IF:
+      writer.writeBranch(command_type, parser.arg1(), parser.arg2()); 
+      break;
+
     case C_INVALID:
       std::cerr << "LINE No. " << lineno << " ERROR: The command [" << line << "] is not in the VM specification " << std::endl;
       break;
+
+      
     default:
       std::cerr<<"LINE NO. "<< lineno <<" WARNING: The command ["<< line << "] is not implemented." << std::endl;
       break;

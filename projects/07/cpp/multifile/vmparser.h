@@ -68,10 +68,11 @@ public:
   vm_command_type calcCommandType(){
     if(tokens.size()== 0)
       return(C_EMPTY);
+    //std::cout << "Token received" << arg1() << std::endl;
     std::string arg1 = tokens[0];
     if(arg1 == "")
       return(C_EMPTY);
-    if(arg1 == "//")
+    if((arg1[0] == '/') && (arg1[1] == '/' ))
       return(C_COMMENT);
     if(arg1 == "return")
       return(C_RETURN);
