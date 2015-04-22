@@ -1,4 +1,6 @@
-
+#include <sys/types.h>
+#include <dirent.h>
+#include <errno.h>
 #include <iostream>
 #include <string.h>
 #include <fstream>
@@ -10,6 +12,23 @@
 #include <algorithm>
 //using namespace std;
 
+int getdir (std::string dir, std::vector<std::string> &files)
+{
+  DIR *dp;
+  struct dirent *dirp;
+  if((dp  = opendir(dir.c_str())) == NULL) {
+    std::cout << "Error(" << errno << ") opening " << dir << std::endl;
+    return errno;
+  }
+
+  while ((dirp = readdir(dp)) != NULL) {
+    files.push_back(std::string(dirp->d_name));
+  }
+  closedir(dp);
+  return 0;
+}
+
+
 int main(int argc, char **argv){
   
   
@@ -18,12 +37,20 @@ int main(int argc, char **argv){
   std::string out ="Xxx.asm";
   std::string  line;
   int lineno;
+  std::string target_dir; 
+  std::vector<std::string> filesindir;
 
   vm_command_type command_type;
-  if(argc >1)
+  size_t argv1len=0, argv2len=0;
+  
+  
+  if(argc >1){
+    argv1len = strlen(argv[1]);
     in.assign(argv[1]); // get input filename from command line argument.
-  if(argc >2)
+  }
+  if(argc >2){
     out.assign(argv[2]);
+  }
 
   vmparser parser(in);
   codewriter writer(out);
