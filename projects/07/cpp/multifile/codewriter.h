@@ -27,26 +27,27 @@ public:
     if(!outfile)
       std::cerr << "CODE WRITER: Error Opening Output file [" << filename.c_str() << "] \n";
     symcount =0;stackbase=256; heapbase=2048; pointerbase=3; tempbase=5;
-    //writeinit();
+    writeinit();
   }
   
   
   void writeinit(){//sets up the memory segments in registers at the begining.
     
     outfile << " @"<<stackbase<<"\r\n D=A\r\n @SP\r\n M=D\r\n"; 
+    writeCall("Sys.init", 0);
     // put stackbase=256 in SP. Stack starts at RAM address 256.
     // The ARG, LCL, THIS, THAT segments dependant on the function that is being called.
     // Here we initilize those assuming that we are in main() function.
-    outfile <<" @"<< heapbase << "\r\n D=A\r\n @ARG\r\n M=D\r\n";
+    //outfile <<" @"<< heapbase << "\r\n D=A\r\n @ARG\r\n M=D\r\n";
     // Segment argument for arguments is initially set to the heap base. We will set aside 256 RAM
     //addresses for argument segment. Base addres of argument segment is saved in the ARG register.
-    outfile <<" @"<< (heapbase + 256) << "\r\n D=A\r\n @LCL\r\n M=D\r\n";
+    //outfile <<" @"<< (heapbase + 256) << "\r\n D=A\r\n @LCL\r\n M=D\r\n";
     //Segment local will be mapped to heapbase+256, where argument segment ends. It will be assigned
     //1024 memory addresses. Its base address will be stored in register LCL.
-    outfile <<" @"<< (heapbase + 256 + 1024) << "\r\n D=A\r\n @THIS\r\n M=D\r\n";
+    //outfile <<" @"<< (heapbase + 256 + 1024) << "\r\n D=A\r\n @THIS\r\n M=D\r\n";
     // Segment this starts where segment local ends. It will be assigned 1024
     // memory addresses and its address will be stored in THIS register. 
-    outfile <<" @"<< (heapbase + 256 + 1024 + 1024) << "\r\n D=A\r\n @THAT\r\n M=D\r\n";
+    //outfile <<" @"<< (heapbase + 256 + 1024 + 1024) << "\r\n D=A\r\n @THAT\r\n M=D\r\n";
     // Segment that starts where semgemnt this ends. Since we don't need any other segment in heap, segmant that can grow
     // uptill the end of heap. its base address will be stored in THAT register.
     // Initialization is complete.
@@ -270,7 +271,7 @@ public:
       //std::string symbol1 = getNextSymbolName(); //get two symbols to manage branching.
       //std::string symbol2 = getNextSymbolName();
       outfile << popDfromStack(); //put top of stack to D
-      outfile << incrementSP(); //incrementing Stack after popping top element to D
+      //outfile << incrementSP(); //pop the top most element
       //is necessary because we just want to look at the top element, not pop the top element.
       outfile << "@" << label << "\r\n D;JNE\r\n" ;
 
@@ -291,7 +292,7 @@ public:
   }
   void writeCall(std::string f, int n){
     std::string return_label;
-    return_label = vmfilename + "." + getLabelPrefix() + "$" + getNextSymbolName();
+    return_label = getLabelPrefix() + "$" + getNextSymbolName();
     outfile << "// preparing new call to function. \n // pushing return address to stack \r\n";
     outfile << " @" <<return_label << "\r\n D=A\r\n" << pushDtoStack(); //pushing the return address to stack.
     outfile << "// push LCL \r\n @LCL\r\n D=M\r\n" << pushDtoStack();  //push LCL(current_value) 
@@ -315,11 +316,11 @@ public:
 
   }
   void writeReturn(){
-    if(funcstack.empty()){
-      std::cerr << "A return from what? \n";
-      return;
-    }
-    funcstack.pop(); // when returning from a function, pop its names so that labels are constructed properly after this function.
+    //if(funcstack.empty()){
+    //std::cerr << "A return from what? \n";
+    //return;
+    //}
+    //funcstack.pop(); // when returning from a function, pop its names so that labels are constructed properly after this function.
     outfile << "//preparing to return from function \r\n";
     outfile << "//FRAME = LCL (FRAME=R13) \r\n";
     outfile << " @LCL\r\n D=M\r\n @R13\r\n M=D\r\n"; //stored contents of LCL into R13.
@@ -355,13 +356,13 @@ public:
   }
   std::string getLabelPrefix(){
     if(funcstack.empty())
-      return("");
+      return("null");
     else
       return(funcstack.top());
   }
   ~codewriter(){
     // Write an indefinite loop at the end.
-    outfile << "(END)\r\n @END\r\n 0;JMP\r\n";
+    //outfile << "(END)\r\n @END\r\n 0;JMP\r\n";
 
     outfile.close(); //release resources
   }
