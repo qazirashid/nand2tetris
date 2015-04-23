@@ -27,11 +27,11 @@ public:
     if(!outfile)
       std::cerr << "CODE WRITER: Error Opening Output file [" << filename.c_str() << "] \n";
     symcount =0;stackbase=256; heapbase=2048; pointerbase=3; tempbase=5;
-    writeinit();
+    // writeInit();
   }
   
   
-  void writeinit(){//sets up the memory segments in registers at the begining.
+  void writeInit(){//sets up the memory segments in registers at the begining.
     
     outfile << " @"<<stackbase<<"\r\n D=A\r\n @SP\r\n M=D\r\n"; 
     writeCall("Sys.init", 0);
@@ -321,12 +321,30 @@ public:
     //return;
     //}
     //funcstack.pop(); // when returning from a function, pop its names so that labels are constructed properly after this function.
+    
+    //function result is on top of stack.
     outfile << "//preparing to return from function \r\n";
     outfile << "//FRAME = LCL (FRAME=R13) \r\n";
-    outfile << " @LCL\r\n D=M\r\n @R13\r\n M=D\r\n"; //stored contents of LCL into R13.
-    outfile <<"// putting the returned result on top of stack of calling function.\r\n"; //popping result from called stack and pushing it to calling stack.
-    outfile << popDfromStack() << " @ARG\r\n A=M\r\n M=D\r\n"; // We went to location where ARG's contents were pointing and stored D there. 
-    //This location was the base address of ARG segment of called function and hence was the next location to the top of calling function stack.
+    outfile << " @LCL\r\n D=M\r\n @R13\r\n M=D\r\n"; // stored contents of LCL into R13 as Frame.
+    // The contents of LCL and R13 are pointers that point now point to a stack location where contents of THAT were stored before call.
+    //subtract 5 from contents of R13 and get a pointer to return address.
+    outfile << "//saving return address; \r\n ";
+    outfile << " @R13\r\n D=M\r\n" << pushDtoStack() << " @5\r\n D=A\r\n" << pushDtoStack();
+    writeArithmetic("sub");
+    // now a pointer to  return address is at top of stack. Dereference it and store the result in R14
+    outfile << popDfromStack() << " A=D\r\n D=M\r\n";
+    //  We have popped the pointer to register D, dereferenced it and got the result in D.
+    // D now contains the return address.
+    outfile << "@R14\r\n M=D\r\n"; //resturn address saved in R14.
+    //now result is once again on top of stack. So put it on top of stack of calling function.
+ 
+    outfile <<"// putting the returned result on top of stack of calling function.\r\n"; 
+    //popping result from called stack and pushing it to calling stack.
+    outfile << popDfromStack() << " @ARG\r\n A=M\r\n M=D\r\n"; // We went to location where ARG's contents were pointing and stored D there.   //if function was a 0 argument function, the above instruction will overwrite the return 
+    //address that was saved by the call instruction. 
+    //So return address must be saved somewhere. We have now already saved it in R14.
+    //This location was the base address of ARG segment of called function and hence 
+    //was the next location to the top of calling function stack.
     outfile << " // restoring Stack pointer \r\n";
     outfile << " @ARG\r\n D=M \r\n D=D+1\r\n @SP\r\n M=D\r\n";
     // The ARG was pointing at the top of stack of calling function. We got that address into D.
@@ -347,10 +365,10 @@ public:
     outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M \r\n @LCL\r\n M=D\r\n"; // retored LCL
     // if we decrement R13 just once more its contents will point at the value of returned address. 
     outfile << "// Getting Return aAddress \r\n";
-    outfile << " @R13\r\n M=M-1\r\n A=M \r\n D=M\r\n"; //return address is in D now.
-    //everything seems ready. Lets just get return address into A and Jump.
+    outfile << " @R14\r\n A=M \r\n "; //return address is in A now.
+    //everything seems ready. 
     outfile << " // All ready. Eyes closed. jumping now.\r\n";
-    outfile <<  " A=D \r\n 0;JMP\r\n"; //hopefully  we will get there where we wanted to go.
+    outfile <<  "0;JMP\r\n"; //hopefully  we will get there where we wanted to go.
 
     
   }
